@@ -36,12 +36,67 @@ describe "one_of" do
  it "will succeed if given string matches one of given values" do
 	string = "var alpha = 5"
 	string2= "bar alpha = 5"
-	expect(one_of(char("v"), char("b")).parse(string).value.value).to eq("v")
-	expect(one_of(char("v"), char("b")).parse(string2).value.value).to eq("b")
+	expect(Parser.parse(one_of(char("v"), char("b")), string)).to eq(Result.okay("v"))
+	expect(Parser.parse(one_of(char("v"), char("b")), string2)).to eq(Result.okay("b"))
  end
 
  it "will fail if values do not match" do
 	 string = "var alpha = 5"
 	 expect(one_of(char("f"), char("b")).parse(string).value).to eq("Given string does not match b")
  end
+
+ it "can take three arguments" do
+	string = "var alpha = 5"
+	string2= "bar alpha = 5"
+	string3 = "car alpha = 5"
+	expect(Parser.parse(one_of(char("v"), char("b"), char("c")), string)).to eq(Result.okay("v"))
+	expect(Parser.parse(one_of(char("v"), char("b"), char("c")), string2)).to eq(Result.okay("b"))
+	expect(Parser.parse(one_of(char("v"), char("b"), char("c")), string3)).to eq(Result.okay("c"))
+ end
+
 end
+
+describe "int" do
+	it "returns okay for integer" do
+		expect(Parser.parse(int, "1")).to eq(Result.okay(1))
+	end
+
+	it "returns error when given non integer" do
+		expect(Parser.parse(int, "a")).to eq(Result.error("Expected number 1-9. Boo"))
+	end
+
+	it "returns okay for two digit int" do
+		expect(Parser.parse(int, "12")).to eq(Result.okay(12))
+	end
+
+	it "errors out if both digits arent digits" do
+		expect(Parser.parse(int, "1a")).to eq(Result.okay(1))
+	end
+
+	it "errors out if both digits arent digits" do
+		expect(Parser.parse(int, "a1")).to eq(Result.error("Expected number 1-9. Boo"))
+	end
+
+	it "can take n number of digits" do
+		expect(Parser.parse(int, "1442")).to eq(Result.okay(1442))
+	end
+end
+
+describe "letter" do
+	it "checks for empty space" do
+		string = " "
+		expect(letter.parse(string).value).to eq("Given string is empty space")
+	end
+	it "can parse if not empty space" do
+		string = "a"
+		expect(Parser.parse(letter, string)).to eq(Result.okay(string))
+	end
+end
+
+describe "any_word" do
+	it "can parse any word" do
+		string = "boris"
+		expect(Parser.parse(any_word, string)).to eq(Result.okay(string))
+	end
+end
+

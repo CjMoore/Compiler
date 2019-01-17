@@ -76,6 +76,28 @@ class Parser
 	def parse(string)
 		@block.call(string)
 	end
+
+	def self.parse(parser, string)
+		parser.parse(string).map do |state| 
+			state.value
+		end
+	end
+
+	def map(&block)
+		Parser.new do |string|
+			parse(string).map do |state|
+				block.call(state)
+			end
+		end
+	end
+
+	def map_error(&block)
+		Parser.new do |string|
+			parse(string).map_error do |state|
+				block.call(state)
+			end
+		end
+	end
 end
 
 def char(character)
@@ -103,14 +125,75 @@ def any_char
 	end
 end
 
-def one_of(option1, option2)
+def one_of(*options)
   Parser.new do |string|
-		if option1.parse(string).type == :okay
-			option1.parse(string)
-		else	
-		  option2.parse(string)
+		options.inject(Result.error("no options given")) do |result, option| 
+			if result.type == :okay
+				result
+			else	
+				option.parse(string)
+			end
 		end
 	end	
+end
+
+def int
+	Parser.new do |string|
+	  result = digit.parse(string)
+		result.bind do |state|
+			int_helper(state)
+		end
+	end
+end
+
+def int_helper(state)
+	result = digit.parse(state.string)	
+	result.bind do |state2|
+		int_helper(State.new(state2.string, state.value * 10 + state2.value))
+	end.bind_error do |error_string|
+		Result.okay(state)	
+	end
+end
+
+def letter
+	Parser.new do |string|
+	  result = any_char.parse(string)
+		result.bind do |state|
+			if state.value !=  " "
+				Result.okay(state)
+			else
+			  Result.error("Given string is empty space")	
+			end
+		end
+	end
+end
+
+def any_word
+	Parser.new do |string|
+	  result = letter.parse(string)
+		result.bind do |state|
+			word_helper(state)
+		end
+	end
+end
+
+def word_helper(state)
+	result = letter.parse(state.string)	
+	result.bind do |state2|
+		word_helper(State.new(state2.string, state.value + state2.value))
+	end.bind_error do |error_string|
+		Result.okay(state)	
+	end
+end
+
+#Next Time zero or more - abstract word helper + int helper. reduce duplication. One or more helper which will work similarly to zero or more - require at least first one to match. pass parser and a way to join values.  
+
+def digit
+	one_of(char("1"), char("2"), char("3"), char("4"), char("5"), char("6"), char("7"), char("8"), char("9"), char("0")).map do |state|
+		State.new(state.string, state.value.to_i)		
+	end.map_error do |error_string|
+		"Expected number 1-9. Boo"
+	end
 end
 
 class Result
@@ -133,6 +216,34 @@ class Result
 		else
 			self
 		end
+	end
+
+	def map(&block) 
+		if @type == :okay
+			Result.okay(block.call(@value))
+		else
+			self		
+		end
+	end
+
+	def map_error(&block)
+		if @type == :error
+			Result.error(block.call(@value))
+		else
+			self
+		end
+	end
+
+	def bind_error(&block)
+		if @type == :error
+			block.call(@value)
+		else
+			self
+		end
+	end
+
+	def ==(other)
+		other.type == self.type && other.value == self.value
 	end
 
 	attr_reader :type, :value
