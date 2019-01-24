@@ -125,6 +125,8 @@ def any_char
 	end
 end
 
+#for add we want to find a left paren then any_word then any_int then any_int then closing paren
+
 def one_of(*options)
   Parser.new do |string|
 		options.inject(Result.error("no options given")) do |result, option| 
@@ -137,25 +139,33 @@ def one_of(*options)
 	end	
 end
 
-def int
-	Parser.new do |string|
-	  result = digit.parse(string)
-		result.bind do |state|
-			int_helper(state)
-		end
-	end
+def any_int
+	one_or_more(digit) { |digit1, digit2| digit1 * 10 + digit2}
 end
 
-def int_helper(state)
-	result = digit.parse(state.string)	
+def any_word
+	one_or_more(non_space) { |letter1, letter2| letter1 + letter2 }
+end
+
+def one_or_more(parser, &block)
+	Parser.new do |string|
+		result = parser.parse(string)
+		result.bind do |state|
+			one_or_more_helper(state, parser, &block)
+		end
+	end	
+end
+
+def one_or_more_helper(state, parser, &block)
+	result = parser.parse(state.string)
 	result.bind do |state2|
-		int_helper(State.new(state2.string, state.value * 10 + state2.value))
+		one_or_more_helper(State.new(state2.string, block.call(state.value, state2.value)), parser, &block)
 	end.bind_error do |error_string|
 		Result.okay(state)	
 	end
 end
 
-def letter
+def non_space
 	Parser.new do |string|
 	  result = any_char.parse(string)
 		result.bind do |state|
@@ -168,23 +178,36 @@ def letter
 	end
 end
 
-def any_word
+def add_expression
 	Parser.new do |string|
-	  result = letter.parse(string)
-		result.bind do |state|
-			word_helper(state)
+		char('(').parse(string).bind do |state|
+			any_word.parse(state.string).bind do |state2|
+				one_or_more(char(" ")) { |x, y| x + y }.parse(state2.string).bind do |state3|
+					expression.parse(state3.string).bind do |state4|
+						char(" ").parse(state4.string).bind do |state5|
+							expression.parse(state5.string).bind do |state6|
+								char(")").parse(state6.string).bind do |state7|
+									Result.okay(State.new(state7.string, Expressions.add(state4.value, state6.value)))
+								end
+							end
+						end
+					end
+				end
+			end
 		end
 	end
 end
 
-def word_helper(state)
-	result = letter.parse(state.string)	
-	result.bind do |state2|
-		word_helper(State.new(state2.string, state.value + state2.value))
-	end.bind_error do |error_string|
-		Result.okay(state)	
+def expression
+	one_of(add_expression, number_expression)
+end
+
+def number_expression
+	any_int.map do |state|
+		State.new(state.string, Expressions.number(state.value))
 	end
 end
+
 
 #Next Time zero or more - abstract word helper + int helper. reduce duplication. One or more helper which will work similarly to zero or more - require at least first one to match. pass parser and a way to join values.  
 

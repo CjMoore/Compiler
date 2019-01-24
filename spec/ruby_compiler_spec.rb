@@ -56,40 +56,40 @@ describe "one_of" do
 
 end
 
-describe "int" do
+describe "any_int" do
 	it "returns okay for integer" do
-		expect(Parser.parse(int, "1")).to eq(Result.okay(1))
+		expect(Parser.parse(any_int, "1")).to eq(Result.okay(1))
 	end
 
 	it "returns error when given non integer" do
-		expect(Parser.parse(int, "a")).to eq(Result.error("Expected number 1-9. Boo"))
+		expect(Parser.parse(any_int, "a")).to eq(Result.error("Expected number 1-9. Boo"))
 	end
 
 	it "returns okay for two digit int" do
-		expect(Parser.parse(int, "12")).to eq(Result.okay(12))
+		expect(Parser.parse(any_int, "12")).to eq(Result.okay(12))
 	end
 
 	it "errors out if both digits arent digits" do
-		expect(Parser.parse(int, "1a")).to eq(Result.okay(1))
+		expect(Parser.parse(any_int, "1a")).to eq(Result.okay(1))
 	end
 
 	it "errors out if both digits arent digits" do
-		expect(Parser.parse(int, "a1")).to eq(Result.error("Expected number 1-9. Boo"))
+		expect(Parser.parse(any_int, "a1")).to eq(Result.error("Expected number 1-9. Boo"))
 	end
 
 	it "can take n number of digits" do
-		expect(Parser.parse(int, "1442")).to eq(Result.okay(1442))
+		expect(Parser.parse(any_int, "1442")).to eq(Result.okay(1442))
 	end
 end
 
 describe "letter" do
 	it "checks for empty space" do
 		string = " "
-		expect(letter.parse(string).value).to eq("Given string is empty space")
+		expect(non_space.parse(string).value).to eq("Given string is empty space")
 	end
 	it "can parse if not empty space" do
 		string = "a"
-		expect(Parser.parse(letter, string)).to eq(Result.okay(string))
+		expect(Parser.parse(non_space, string)).to eq(Result.okay(string))
 	end
 end
 
@@ -100,3 +100,25 @@ describe "any_word" do
 	end
 end
 
+describe "add_expression" do
+	it "can parse an add expression" do
+		string = "(add 1 3)"
+		output = Expressions.add(Expressions.number(1), Expressions.number(3))
+
+		expect(Parser.parse(add_expression, string)).to eq(Result.okay(output))
+	end
+
+	it "breaks with extra spaces" do
+		string = "(add  3 36)"
+		output = Expressions.add(Expressions.number(3), Expressions.number(36))
+
+		expect(Parser.parse(add_expression, string)).to eq(Result.okay(output))
+	end
+
+	it "can parse nested add expresssions" do
+		string = "(add  3 (add 3 6))"
+		output = Expressions.add(Expressions.number(3), Expressions.add(Expressions.number(3), Expressions.number(6)))
+
+		expect(Parser.parse(add_expression, string)).to eq(Result.okay(output))
+	end
+end
