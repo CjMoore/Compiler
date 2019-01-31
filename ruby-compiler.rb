@@ -98,6 +98,14 @@ class Parser
 			end
 		end
 	end
+
+	def apply(&block)
+		Parser.new do |string|
+			parse(string).bind do |state|
+				Result.okay(State.new(state.string, block.call(*state.value)))
+			end
+		end
+	end
 end
 
 def char(character)
@@ -165,20 +173,8 @@ def one_or_more_helper(state, parser, &block)
 	end
 end
 
-def non_space
-	Parser.new do |string|
-	  result = any_char.parse(string)
-		result.bind do |state|
-			if state.value !=  " "
-				Result.okay(state)
-			else
-			  Result.error("Given string is empty space")	
-			end
-		end
-	end
-end
 
-def add_expression
+def old_add_expression
 	Parser.new do |string|
 		char('(').parse(string).bind do |state|
 			any_word.parse(state.string).bind do |state2|
@@ -193,6 +189,67 @@ def add_expression
 						end
 					end
 				end
+			end
+		end
+	end
+end
+
+# Next time lazy helper and 1 or more take optional block and add new expressions
+
+def add_expression
+	Parser.new do |string|
+		sequence(
+			ignore(
+				char("("),
+				any_word,
+				one_or_more(char(" ")) { |x, y| x + y }
+			),
+			expression,
+			ignore(
+				one_or_more(char(" ")) { |x, y| x + y }
+			),
+			expression,
+			ignore(
+				char(")")
+			)
+		).apply {|expression1, expression2| Expressions.add(expression1, expression2)}
+			.parse(string)
+	end
+end
+
+def sequence(*args)
+	Parser.new do |string|
+		args.inject(Result.okay(State.new(string, []))) do |result_values, parser|
+			result_values.bind do |result_state|
+				parser.parse(result_state.string).bind do  |state|
+					if state.value.kind_of?(IgnoredValue) 
+						Result.okay(State.new(state.string, result_state.value))
+					else
+						Result.okay(State.new(state.string, result_state.value + [state.value]))
+					end
+				end
+			end	
+		end
+	end
+end
+
+def ignore(*args) 
+	sequence(*args).map do |state|
+		State.new(state.string, IgnoredValue.new)
+	end	
+end
+
+class IgnoredValue
+end
+
+def non_space
+	Parser.new do |string|
+	  result = any_char.parse(string)
+		result.bind do |state|
+			if state.value !=  " "
+				Result.okay(state)
+			else
+			  Result.error("Given string is empty space")	
 			end
 		end
 	end
