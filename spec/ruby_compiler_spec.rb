@@ -122,3 +122,18 @@ describe "add_expression" do
 		expect(Parser.parse(add_expression, string)).to eq(Result.okay(output))
 	end
 end
+
+describe "function_definition_expression" do
+	it "can parse a function with a single arguement" do
+		## (define funcName arg1 arg2 arg (...))\
+		##   (add (add a a) (add b b)))
+		## (define double a
+		##   (add a a))
+		## (double 5)
+
+		string = "(define double a (add a a))"
+		output = Expressions.function("double", ["a"], Expressions.add(Expressions.variable("a"), Expressions.variable("a")))
+
+		expect(Parser.parse(expression, string)).to eq(Result.okay(output))
+	end	
+end

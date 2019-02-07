@@ -115,10 +115,24 @@ def char(character)
 			if state.value == character
 				Result.okay(state)
 			else
-			  Result.error("Given string does not match #{character}")	
+				Result.error("Given string does not match #{character}")	
 			end
 		end
 	end
+end
+
+def word(word_string)
+	Parser.new do |string|
+	  result = any_word.parse(string)
+		result.bind do |state|
+			if state.value == word_string 
+				Result.okay(state)
+			else
+			  Result.error("Given string does not match #{word_string}")	
+			end
+		end
+	end
+
 end
 
 def any_char
@@ -152,14 +166,18 @@ def any_int
 end
 
 def any_word
-	one_or_more(non_space) { |letter1, letter2| letter1 + letter2 }
+	one_or_more(non_space_or_paren) 
 end
 
 def one_or_more(parser, &block)
 	Parser.new do |string|
 		result = parser.parse(string)
 		result.bind do |state|
-			one_or_more_helper(state, parser, &block)
+			if block_given?
+				one_or_more_helper(state, parser, &block)
+			else
+				one_or_more_helper(state, parser) { |x, y| x + y }
+			end
 		end
 	end	
 end
@@ -197,25 +215,32 @@ end
 # Next time lazy helper and 1 or more take optional block and add new expressions
 
 def add_expression
-	Parser.new do |string|
+	lazy do 
 		sequence(
 			ignore(
 				char("("),
-				any_word,
-				one_or_more(char(" ")) { |x, y| x + y }
+				word("add"), 
+				one_or_more(char(" "))
 			),
 			expression,
 			ignore(
-				one_or_more(char(" ")) { |x, y| x + y }
+				one_or_more(char(" "))
 			),
 			expression,
 			ignore(
 				char(")")
 			)
 		).apply {|expression1, expression2| Expressions.add(expression1, expression2)}
-			.parse(string)
 	end
 end
+
+def lazy(&block)
+	Parser.new do |string|
+		block.call.parse(string)
+	end
+end
+
+#Next time need to make it so it can take more than one arguement and we need to do invocation. 
 
 def sequence(*args)
 	Parser.new do |string|
@@ -239,6 +264,38 @@ def ignore(*args)
 	end	
 end
 
+def function_definition_expression
+	lazy do 
+		sequence(
+			ignore(
+				char("("),
+				word("define"), 
+				one_or_more(char(" "))
+			),
+			any_word,
+			ignore_spaces,
+			any_word,
+			ignore_spaces,
+			expression,
+			ignore(
+				char(")")
+			),
+		).apply {|name, arg, expression| Expressions.function(name, [arg], expression)}
+	end
+end
+
+def ignore_spaces
+	ignore(
+		one_or_more(char(" "))
+	)
+end
+
+def variable_expression
+	any_word.map do |state|
+		State.new(state.string, Expressions.variable(state.value))
+	end
+end
+
 class IgnoredValue
 end
 
@@ -255,8 +312,21 @@ def non_space
 	end
 end
 
+def non_space_or_paren
+	Parser.new do |string|
+		result = any_char.parse(string)
+		result.bind do |state|
+			if state.value !=  " " && state.value != "(" && state.value != ")"
+				Result.okay(state)
+			else
+			  Result.error("Given string is empty space or paren")	
+			end
+		end
+	end
+end
+
 def expression
-	one_of(add_expression, number_expression)
+	one_of(function_definition_expression, add_expression, number_expression, variable_expression)
 end
 
 def number_expression
@@ -264,9 +334,6 @@ def number_expression
 		State.new(state.string, Expressions.number(state.value))
 	end
 end
-
-
-#Next Time zero or more - abstract word helper + int helper. reduce duplication. One or more helper which will work similarly to zero or more - require at least first one to match. pass parser and a way to join values.  
 
 def digit
 	one_of(char("1"), char("2"), char("3"), char("4"), char("5"), char("6"), char("7"), char("8"), char("9"), char("0")).map do |state|
@@ -371,6 +438,7 @@ end
 #
 # (double 5 7)
 
+
 module Javascript
 	class << self
 		def compile(expression)
@@ -389,3 +457,6 @@ module Javascript
 		end
 	end
 end
+
+string = "(define quadruple a (add (add a a) (add a a)))"
+Parser.parse(function_definition_expression, string).map { |e| Javascript.compile(e) }
